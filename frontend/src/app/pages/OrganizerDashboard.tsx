@@ -223,6 +223,7 @@ if (editingEvent) {
 
   if (!error) {
     alert(editingEvent ? "Event updated successfully ✨" : "Event created successfully 🎉");
+    window.location.reload();
     setShowCreateForm(false);
     setEventName('');
     setEventDescription('');
@@ -248,6 +249,68 @@ const handleUndo = () => {
 
 let deleteTimeout: any;
 
+const handleUploadImage = async () => {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+
+  fileInput.onchange = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
+
+// 🔥 IMPORTANT: add folder path
+const filePath = `public/${Date.now()}-${cleanName}`;
+
+const { error: uploadError } = await supabase.storage
+  .from("gallery")
+  .upload(filePath, file);
+
+if (uploadError) {
+  console.log("UPLOAD ERROR:", uploadError);
+  alert("Upload failed ❌");
+  return;
+}
+
+    if (uploadError) {
+      alert("Upload failed");
+      console.log(uploadError);
+      return;
+    }
+
+    const publicUrl = supabase.storage
+  .from("gallery")
+  .getPublicUrl(filePath).data.publicUrl;
+
+    // 1. get organizer society
+const { data: organizer } = await supabase
+  .from('profiles')
+  .select('society')
+  .eq('id', user.id)
+  .single();
+
+const societyName = organizer?.society || "";
+
+const { error: insertError } = await supabase
+  .from("gallery")
+  .insert([
+    {
+      society: societyName.toLowerCase().trim(),
+      image_url: publicUrl,
+    },
+  ]);
+
+    if (insertError) {
+      alert("DB insert failed");
+      console.log(insertError);
+    } else {
+      alert("Image uploaded!");
+    }
+  };
+
+  fileInput.click();
+};
   return (
     <div className="min-h-screen py-16">
       <div className="max-w-7xl mx-auto px-6">
@@ -609,30 +672,192 @@ let deleteTimeout: any;
               <h2 className="text-2xl mb-6">Society Page</h2>
 
               <div className="bg-card border border-border rounded-3xl p-6 space-y-4">
-                <button className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
-                  <span>Update About Section</span>
-                  <Edit className="w-5 h-5" />
-                </button>
+                <button
+  onClick={async () => {
+    const newAbout = prompt("Enter About Section");
+    if (!newAbout || !user) return;
 
-                <button className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
-                  <span>Manage Team Members</span>
-                  <Edit className="w-5 h-5" />
-                </button>
+    const { data: existing } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', user.id)
+  .limit(1);
 
-                <button className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
-                  <span>Add Achievements</span>
-                  <Edit className="w-5 h-5" />
-                </button>
+let error;
 
-                <button className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
+if (existing && existing.length > 0) {
+  const { error: updateError } = await supabase
+  .from('profiles')
+  .update({
+    about: newAbout,
+  })
+  .eq('id', user.id);
+
+if (!updateError) {
+  alert("About updated ✅");
+  window.location.reload();
+} else {
+  console.log(updateError);
+  alert("Update failed ❌");
+}
+} else {
+  const res = await supabase
+    .from('profiles')
+    .insert([
+  {
+    id: user.id,
+    about: newAbout,
+    role: 'organizer',
+    society: "rotaract", // 👈 IMPORTANT
+  },
+]);
+
+  error = res.error;
+  if (!error) {
+  alert("About updated ✅");
+  window.location.reload();
+}
+}
+  
+if (error) {
+  console.log(error);
+  alert("Error updating about");
+}}}
+  className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all"
+>
+  <span>Update About Section</span>
+  <Edit className="w-5 h-5" />
+</button>
+
+                <button
+  onClick={async () => {
+  const email = prompt("Enter member email");
+  const name = prompt("Enter member name");
+
+  if (!email || !user) return;
+
+  // 1. get organizer society
+  const { data: organizer } = await supabase
+    .from('profiles')
+    .select('society')
+    .eq('id', user.id)
+    .single();
+
+    const societyName = organizer?.society || "rotaract";
+
+  // 2. check if user exists
+  const { data: existingUser } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .single();
+
+  if (!existingUser) {
+    alert("User must signup first ❗");
+    return;
+  }
+
+  // 3. update role + society
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+  name: name,
+  role: 'society_member',
+  society: societyName,
+})
+    .eq('email', email);
+
+  if (!error) {
+    alert("Member added successfully ✅");
+    window.location.reload();
+  } else {
+    console.log(error);
+    alert("Error adding member");
+  }
+}}
+  className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all"
+>
+  <span>Manage Team Members</span>
+  <Edit className="w-5 h-5" />
+</button>
+
+                <button
+  onClick={async () => {
+    const title = prompt("Enter achievement title");
+    const description = prompt("Enter description");
+
+    if (!title || !user) return;
+
+    const { data: organizer } = await supabase
+      .from('profiles')
+      .select('society')
+      .eq('id', user.id)
+      .single();
+
+    const societyName = organizer?.society || "rotaract";
+    
+    const { error } = await supabase
+    
+      .from('achievements')
+      .insert([
+        {
+          title,
+          description,
+          society: societyName.toLowerCase().trim(),
+        },
+      ]);
+
+    if (!error) {
+  alert("Achievement added ✅");
+  window.location.reload();
+} else {
+  console.log("ACHIEVEMENT ERROR:", error);
+  alert(error.message);
+}
+  }}
+  className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all"
+>
+  <span>Add Achievements</span>
+  <Edit className="w-5 h-5" />
+</button>
+
+                <button onClick={handleUploadImage} className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
                   <span>Upload Gallery</span>
                   <Edit className="w-5 h-5" />
                 </button>
 
-                <button className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all">
-                  <span>Update Social Links</span>
-                  <Edit className="w-5 h-5" />
-                </button>
+                <button
+  onClick={async () => {
+    if (!user) return;
+
+    const instagram = prompt("Enter Instagram URL");
+    const linkedin = prompt("Enter LinkedIn URL");
+    const email = prompt("Enter Contact Email");
+
+    if (!instagram && !linkedin && !email) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        instagram,
+        linkedin,
+        email_contact: email,
+      })
+      .eq("id", user.id);
+
+    if (!error) {
+      alert("Social links updated ✅");
+      window.location.reload();
+    } else {
+      console.log(error);
+      alert("Update failed ❌");
+    }
+  }}
+  className="w-full flex items-center justify-between p-4 bg-muted/50 rounded-2xl hover:bg-muted transition-all"
+>
+  <span>Update Social Links</span>
+  <Edit className="w-5 h-5" />
+</button>
               </div>
             </motion.section>
           </div>

@@ -47,6 +47,8 @@ if (profile.role === 'organizer') {
   navigate('/dashboard/student');
 } else if (profile.role === 'faculty') {
   navigate('/dashboard/admin');
+} else if (profile.role === 'society_member') {
+  navigate('/dashboard/member');
 } else {
   navigate('/');
 }

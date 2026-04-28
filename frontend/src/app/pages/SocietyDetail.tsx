@@ -1,5 +1,7 @@
 import { useParams, Link } from 'react-router';
 import { motion } from 'motion/react';
+import { useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import {
   Calendar,
   MapPin,
@@ -13,106 +15,103 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-const societyData: Record<string, any> = {
-  gdg: {
-    name: 'GDG IGDTUW',
-    tagline: 'Google Developer Group - Building tech together',
-    category: 'Technical',
-    color: 'bg-primary',
-    about:
-      'GDG on Campus IGDTUW is a community of students passionate about Google technologies. We organize workshops, hackathons, and study jams to help students learn and grow in the tech field.',
-    faculty: {
-      name: 'Dr. Priya Sharma',
-      designation: 'Associate Professor, CSE Department',
-    },
-    team: [
-      { name: 'Ananya Verma', role: 'President', photo: '' },
-      { name: 'Sakshi Gupta', role: 'Vice President', photo: '' },
-      { name: 'Riya Singh', role: 'Technical Lead', photo: '' },
-      { name: 'Neha Rao', role: 'Event Lead', photo: '' },
-    ],
-    achievements: [
-      'Organized Solution Challenge 2025 with 200+ participants',
-      'Hosted Cloud Study Jam with Google Cloud certification',
-      'Winner of Best GDG Chapter Award 2024',
-      'Conducted 15+ workshops on various Google technologies',
-    ],
-    upcomingEvents: [
-      {
-        id: 2,
-        name: 'AI/ML Workshop',
-        date: 'Tomorrow, 4:00 PM',
-        venue: 'Lab 301',
-      },
-      {
-        id: 6,
-        name: 'Flutter Bootcamp',
-        date: 'Apr 20, 2:00 PM',
-        venue: 'Seminar Hall',
-      },
-    ],
-    pastEvents: [
-      'Solution Challenge Hackathon',
-      'Android Study Jam',
-      'Cloud Computing Workshop',
-      'DevFest 2025',
-    ],
-    socials: {
-      instagram: 'https://instagram.com/gdg.igdtuw',
-      linkedin: 'https://linkedin.com/company/gdg-igdtuw',
-      email: 'gdg@igdtuw.ac.in',
-    },
-  },
-  tarannum: {
-    name: 'Tarannum',
-    tagline: 'Music Society - Find your voice',
-    category: 'Cultural',
-    color: 'bg-secondary',
-    about:
-      'Tarannum is the official music society of IGDTUW. We celebrate all forms of music - from classical to contemporary. Our mission is to provide a platform for students to explore their musical talents.',
-    faculty: {
-      name: 'Prof. Anjali Mehta',
-      designation: 'Associate Professor, Humanities',
-    },
-    team: [
-      { name: 'Ishita Kapoor', role: 'President', photo: '' },
-      { name: 'Meera Joshi', role: 'Vice President', photo: '' },
-      { name: 'Kavya Sharma', role: 'Music Director', photo: '' },
-    ],
-    achievements: [
-      'First Place at Inter-College Music Competition 2025',
-      'Performed at Taarangana Main Stage',
-      'Organized successful Open Mic series with 500+ attendees',
-      'Released original music album "Harmony"',
-    ],
-    upcomingEvents: [
-      {
-        id: 7,
-        name: 'Classical Music Night',
-        date: 'Apr 18, 7:00 PM',
-        venue: 'Auditorium',
-      },
-    ],
-    pastEvents: [
-      'Open Mic Night',
-      'Acoustic Evening',
-      'Battle of Bands',
-      'Music Therapy Workshop',
-    ],
-    socials: {
-      instagram: 'https://instagram.com/tarannum.igdtuw',
-      linkedin: 'https://linkedin.com/company/tarannum-igdtuw',
-      email: 'tarannum@igdtuw.ac.in',
-    },
-  },
-};
 
 export function SocietyDetail() {
   const { id } = useParams();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [society, setSociety] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [gallery, setGallery] = useState<any[]>([]);
+  useEffect(() => {
+  const fetchSociety = async () => {
+    if (!id) return;
 
-  const society = societyData[id || 'gdg'] || societyData.gdg;
+    // 1. Fetch organizer (for about section)
+    const { data: org } = await supabase
+      .from('profiles')
+      .select('society, about, instagram, linkedin, email_contact')
+      .eq('society', id)
+      .eq('role', 'organizer')
+      .limit(1);
 
+    if (org && org.length > 0) {
+  const organizer = org[0];
+
+  setSociety({
+  name: organizer.society,
+  about: organizer.about || "This society has not added description yet.",
+  faculty: {
+    name: "Not Assigned",
+    designation: "",
+  },
+  upcomingEvents: [],
+  pastEvents: [],
+  socials: {
+  instagram: organizer.instagram || "#",
+  linkedin: organizer.linkedin || "#",
+  email: organizer.email_contact || "",
+},
+  category: "General",
+  tagline: "",
+});
+} else {
+  setSociety({
+  name: id,
+  about: "This society has not added description yet.",
+  faculty: {
+    name: "Not Assigned",
+    designation: "",
+  },
+  upcomingEvents: [],
+  pastEvents: [],
+  socials: {
+    instagram: "#",
+    linkedin: "#",
+    email: "",
+  },
+  category: "General",
+  tagline: "",
+});
+}
+
+    // 2. Fetch members
+    const { data: membersData } = await supabase
+      .from('profiles')
+      .select('name, role, email')
+      .eq('society', id)
+      .eq('role', 'society_member');
+
+    setMembers(membersData || []);
+
+    // 3. Fetch achievements
+const { data: achData } = await supabase
+  .from('achievements')
+  .select('*')
+  .ilike('society', id?.toLowerCase().trim());
+
+  // 4. Fetch gallery
+const { data: galleryData } = await supabase
+  .from('gallery')
+  .select('*')
+  .ilike('society', id?.toLowerCase().trim());
+
+console.log("GALLERY DATA:", galleryData);
+
+setGallery(Array.isArray(galleryData) ? galleryData : []);
+
+  console.log("ACH DATA:", achData);
+console.log("ROUTE ID:", id);
+console.log("MATCHING WITH:", id?.toLowerCase().trim());
+
+setAchievements(Array.isArray(achData) ? achData : []);
+  };
+
+  fetchSociety();
+}, [id]);
+  if (!society) {
+  return <div className="text-white p-6">Loading...</div>;
+}
   return (
     <div className="min-h-screen">
       <section className={`${society.color} relative py-24 px-6`}>
@@ -124,9 +123,9 @@ export function SocietyDetail() {
             className="text-center text-white"
           >
             <div className="w-24 h-24 mx-auto mb-6 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center text-5xl border-2 border-white/30">
-              {society.name[0]}
+              {society?.name?.[0] || "?"}
             </div>
-            <h1 className="text-5xl mb-3">{society.name}</h1>
+            <h1 className="text-5xl mb-3">{society?.name || "Loading..."}</h1>
             <p className="text-xl text-white/90 mb-6">{society.tagline}</p>
             <div className="flex items-center justify-center gap-4">
               <motion.button
@@ -161,7 +160,7 @@ export function SocietyDetail() {
             <h2 className="text-3xl">About Society</h2>
           </div>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-4xl">
-            {society.about}
+            {society?.about || "No description available"}
           </p>
         </motion.section>
 
@@ -175,22 +174,20 @@ export function SocietyDetail() {
             <h2 className="text-3xl">Core Team</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {society.team.map((member: any, index: number) => (
-              <motion.div
-                key={member.name}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
-                className="bg-card border border-border rounded-3xl p-6 text-center hover:shadow-lg transition-all"
-              >
-                <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white text-2xl">
-                  {member.name[0]}
-                </div>
-                <h3 className="mb-1">{member.name}</h3>
-                <p className="text-sm text-muted-foreground">{member.role}</p>
-              </motion.div>
-            ))}
-          </div>
+  {members.length === 0 ? (
+    <p>No team members added yet.</p>
+  ) : (
+    members.map((member, index) => (
+      <div
+        key={index}
+        className="bg-card border border-border rounded-2xl p-4 text-center"
+      >
+        <h4 className="font-semibold">{member.name || "Unnamed"}</h4>
+        <p className="text-sm text-muted-foreground">{member.email}</p>
+      </div>
+    ))
+  )}
+</div>
         </motion.section>
 
         <motion.section
@@ -201,12 +198,12 @@ export function SocietyDetail() {
         >
           <div className="flex items-center gap-2 mb-4">
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white text-xl">
-              {society.faculty.name[0]}
+              {society?.faculty?.name?.[0] || "?"}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Faculty Supervisor</p>
-              <h3 className="text-xl">{society.faculty.name}</h3>
-              <p className="text-sm text-muted-foreground">{society.faculty.designation}</p>
+              <h3 className="text-xl">{society?.faculty?.name || "N/A"}</h3>
+              <p className="text-sm text-muted-foreground">{society?.faculty?.designation || "N/A"}</p>
             </div>
           </div>
         </motion.section>
@@ -221,21 +218,22 @@ export function SocietyDetail() {
             <h2 className="text-3xl">Achievements & Highlights</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {society.achievements.map((achievement: string, index: number) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 + index * 0.1 }}
-                className="flex items-start gap-3 bg-card border border-border rounded-2xl p-4"
-              >
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <Trophy className="w-4 h-4 text-primary" />
-                </div>
-                <p className="text-muted-foreground">{achievement}</p>
-              </motion.div>
-            ))}
-          </div>
+  {!achievements || achievements.length === 0 ? (
+  <p>No achievements added yet.</p>
+) : (
+  achievements.map((ach, index) => (
+    <div
+      key={index}
+      className="bg-card border border-border rounded-2xl p-4"
+    >
+      <h4 className="font-semibold">{ach.title}</h4>
+      <p className="text-sm text-muted-foreground">
+        {ach.description}
+      </p>
+    </div>
+  ))
+)}
+</div>
         </motion.section>
 
         <motion.section
@@ -253,7 +251,7 @@ export function SocietyDetail() {
             </Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {society.upcomingEvents.map((event: any, index: number) => (
+            {(society?.upcomingEvents || []).map((event: any, index: number) => (
               <motion.div
                 key={event.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -293,17 +291,17 @@ export function SocietyDetail() {
         >
           <h2 className="text-3xl mb-6">Past Events & Gallery</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {society.pastEvents.map((event: string, index: number) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.1 + index * 0.05 }}
-                className="aspect-square bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center p-4 text-center hover:shadow-lg transition-all"
-              >
-                <p className="text-sm">{event}</p>
-              </motion.div>
-            ))}
+            {!gallery || gallery.length === 0 ? (
+  <p>No images uploaded yet.</p>
+) : (
+  gallery.map((img, index) => (
+    <img
+      key={index}
+      src={img.image_url}
+      className="rounded-2xl"
+    />
+  ))
+)}
           </div>
         </motion.section>
 
@@ -316,7 +314,7 @@ export function SocietyDetail() {
           <h2 className="text-3xl mb-6">Connect With Us</h2>
           <div className="flex items-center justify-center gap-4">
             <a
-              href={society.socials.instagram}
+              href={society?.socials?.instagram || "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="p-4 bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-2xl hover:shadow-lg transition-all"
